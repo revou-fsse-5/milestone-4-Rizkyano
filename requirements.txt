@@ -1,0 +1,10 @@
+Flask
+SQLAlchemy
+PyMySQL
+Flask-JWT-Extended
+marshmallow
+werkzeug
+Flask-Login
+mysql-connector-python
+bcrypt
+python-dotenv
