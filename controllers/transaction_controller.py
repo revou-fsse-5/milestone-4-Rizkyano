@@ -11,50 +11,79 @@ transaction_bp = Blueprint('transactions', __name__)
 @transaction_bp.route('/transaction', methods=['POST'])
 @jwt_required()
 def create_transaction():
+    
     data = request.json
     current_user_id = get_jwt_identity()
 
-    if 'from_account_id' not in data or 'type' not in data or 'amount' not in data:
-        return jsonify({"message": "Missing required fields"}), 400
+    # Check for required fields in request
+    required_fields = ['from_account_id', 'type', 'amount']
+    missing_fields = [field for field in required_fields if field not in data]
+    if missing_fields:
+        return jsonify({"message": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
     db = next(get_db())
 
+    # Validate 'from_account_id' format
     try:
+        from_account_id = int(data['from_account_id'])
+    except ValueError:
+        return jsonify({"message": "Invalid from_account_id format"}), 400
+
+    # Query for the from_account to check ownership
+    from_account = db.query(Account).filter_by(id=from_account_id, user_id=current_user_id).first()
+    if not from_account:
+        return jsonify({"message": "Unauthorized transaction: Invalid from_account_id"}), 403
+
+    try:
+        # Parse the amount and transaction type
         amount = float(data['amount'])
         transaction_type = data['type']
-        
-        from_account = db.query(Account).filter_by(id=data['from_account_id'], user_id=current_user_id).first()
-        if not from_account:
-            return jsonify({"message": "Unauthorized transaction"}), 403
 
+        # Process transaction based on type
         if transaction_type == 'deposit':
             from_account.balance += amount
+
         elif transaction_type == 'withdrawal':
             if from_account.balance < amount:
-                return jsonify({"message": "Insufficient funds"}), 400
+                return jsonify({"message": "Insufficient funds for withdrawal"}), 400
             from_account.balance -= amount
+
         elif transaction_type == 'transfer':
+            # Validate 'to_account_id' and check ownership
             if 'to_account_id' not in data:
                 return jsonify({"message": "Missing to_account_id for transfer"}), 400
-            to_account = db.query(Account).filter_by(id=data['to_account_id'], user_id=current_user_id).first()
+            try:
+                to_account_id = int(data['to_account_id'])
+            except ValueError:
+                return jsonify({"message": "Invalid to_account_id format"}), 400
+
+            # Check that to_account exists and belongs to the current user
+            to_account = db.query(Account).filter_by(id=to_account_id, user_id=current_user_id).first()
             if not to_account:
-                return jsonify({"message": "Invalid transfer"}), 403
+                return jsonify({"message": "Unauthorized transaction: Invalid to_account_id"}), 403
+
+            # Ensure sufficient balance for transfer
             if from_account.balance < amount:
-                return jsonify({"message": "Insufficient funds"}), 400
+                return jsonify({"message": "Insufficient funds for transfer"}), 400
+
+            # Perform the transfer
             from_account.balance -= amount
             to_account.balance += amount
+
         else:
             return jsonify({"message": "Invalid transaction type"}), 400
 
+        # Record the transaction
         transaction = Transaction(
-            from_account_id=data['from_account_id'],
-            to_account_id=data.get('to_account_id'),
+            from_account_id=from_account_id,
+            to_account_id=data.get('to_account_id'),  # to_account_id is optional except for transfers
             amount=amount,
             type=transaction_type,
             description=data.get('description', ''),
             created_at=datetime.utcnow()
         )
 
+        # Save the transaction and commit
         db.add(transaction)
         db.commit()
         return jsonify({"message": "Transaction successful"}), 201
@@ -131,3 +160,4 @@ def get_transaction(transaction_id):
         return jsonify({"message": f"An error occurred: {str(e)}"}), 500
     finally:
         db.close()
+

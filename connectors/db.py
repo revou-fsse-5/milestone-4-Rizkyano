@@ -40,3 +40,7 @@ def db_session():
         yield db
     finally:
         db.close()
+
+        
+                
+        

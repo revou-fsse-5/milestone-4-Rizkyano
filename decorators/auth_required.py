@@ -8,7 +8,7 @@ def auth_required(fn):
     def wrapper(*args, **kwargs):
         try:
             verify_jwt_in_request()
-            user_identity = get_jwt_identity()  # Retrieve user identity if needed
+            user_identity = get_jwt_identity() 
             return fn(*args, **kwargs)
         except NoAuthorizationError:
             return jsonify({"msg": "Missing or invalid token"}), 401

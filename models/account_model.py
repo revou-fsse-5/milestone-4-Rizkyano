@@ -21,3 +21,4 @@ class Account(Base):
             "account_number": self.account_number,
             "balance": self.balance
         }
+        
