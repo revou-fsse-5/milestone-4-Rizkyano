@@ -75,24 +75,20 @@ def get_transactions():
 
     db = next(get_db())
     try:
-        # Fetch user's accounts
         user_accounts = db.query(Account).filter_by(user_id=current_user_id).all()
         user_account_ids = [account.id for account in user_accounts]
 
-        # Base query for transactions involving user's accounts
         query = db.query(Transaction).filter(
             (Transaction.from_account_id.in_(user_account_ids)) |
             (Transaction.to_account_id.in_(user_account_ids))
         )
 
-        # Apply account filter if provided
         if account_id:
             query = query.filter(
                 (Transaction.from_account_id == account_id) |
                 (Transaction.to_account_id == account_id)
             )
-
-        # Apply date range filters if provided
+            
         if start_date:
             start_date = datetime.strptime(start_date, '%Y-%m-%d')
             query = query.filter(Transaction.created_at >= start_date)
@@ -122,7 +118,6 @@ def get_transaction(transaction_id):
         if not transaction:
             return jsonify({"message": "Transaction not found"}), 404
 
-        # Verify if the user owns the account related to the transaction
         from_account = db.query(Account).filter_by(id=transaction.from_account_id, user_id=current_user_id).first()
         to_account = db.query(Account).filter_by(id=transaction.to_account_id, user_id=current_user_id).first()
 
